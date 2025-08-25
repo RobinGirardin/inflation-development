@@ -1,6 +1,6 @@
 print("Loading libraries...")
 
-library("WDI") # Word Bank Data API library
+library("WDI") # World Bank Data API library
 library("readr")
 library("dplyr")
 
