@@ -2,6 +2,7 @@ print("Loading libraries...")
 
 library("WDI") # Word Bank Data API library
 library("readr")
+library("dplyr")
 
 # Indicators of the 'main' dataset, focused on economical factors
 indicators_main <- c(
@@ -38,22 +39,26 @@ main <- WDI(
   start = 2000,
   end = 2024,
 )
+# Rename column names for clarity
+colnames(main) <- c("country", "iso2c", "iso3c", "year", indicators_main)
 print("Data extracted")
 # Write file in RDS format if he doesn't exist
 if (!file.exists("data/raw/main.rds")) {
   print("Path `data/raw/main.rds` don't exist, file will be created in `data/raw/`.")
   write_rds(main, "data/raw/main.rds")
-
 }
+
 
 print("Extracting data from WorldBank API using wdi::WDI() function. Please wait.")
 # Load COMPLEMENTARY dataset
 comp <- WDI(
   country = "all",
-  indicator = names(indicators_main),
+  indicator = names(indicators_comp),
   start = 2000,
   end = 2024,
 )
+# Rename column names for clarity
+colnames(comp) <- c("country", "iso2c", "iso3c", "year", indicators_comp)
 # Write file in RDS format if he doesn't exist
 if (!file.exists("data/raw/comp.rds")) {
   print("Path `data/raw/comp.rds` don't exist, file will be created in `data/raw/`.")
