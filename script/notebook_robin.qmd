@@ -1,3 +1,9 @@
+---
+execute:
+    echo: false
+    include: false
+---
+
 # Inflation Developement Analysis
 
 ## Context
@@ -23,6 +29,8 @@ library(dplyr)
 
 ## Preprocessing
 
+### Joining
+
 As mentioned before, the first step is the merging of both datasets.
 As demonstrated below, there are multiple condidates for merging keys:
 
@@ -38,6 +46,8 @@ comp <- readRDS("data/raw/comp.rds")
 ```
 
 ```{r}
+#| include: true
+
 print(paste0("Length of the 'year' column in `main`: ", length(main$year)))
 print(paste0("Length of the 'year' column in `comp`: ", length(comp$year)))
 
@@ -46,6 +56,8 @@ print(paste0("'year' in main ranges from ", min(comp$year), "to ", max(comp$year
 ```
 
 ```{r}
+#| include: true
+
 print(paste0("Amount of recorded unique countries in `main`: ", length(unique(main$country)), " for ", length(main$country), " total observations"))
 print(paste0("Amount of recorded unique countries in `comp`: ", length(unique(comp$country)), " for ", length(comp$country), " total observations"))
 
@@ -53,10 +65,29 @@ print(paste0("Is Switzerland named 'Switzerland' (EN)? ", ("Switzerland" %in% un
 ```
 
 ```{r}
-join <- right_join(main, comp, by=c("year", "country", "iso2c", "iso3c"))
+#| echo: true
+join <- left_join(main, comp, by=c("year", "country", "iso2c", "iso3c"))
 ```
+
+## Cleaning
+
+The data contains a lot of different countries. A useful denomination to discriminate them could be useful for further analysis.
+
+# Exploration
+
+```{r}
+is_num <- function(x){
+    return(is.numeric(join[[x]]))
+}
+
+is_num(colnames(join)[1])
+is_num_columns <- lapply(colnames(join), FUN = is_num)
+sel <- dplyr::select(data = join, is_num_columns)
+cor(sel)
+```
+
 
 
 # Sources
 
-Our source of datasets and indicators: [World Bank Group](https://data.worldbank.org/indicator)
+Datasets and indicators: [World Bank Group](https://data.worldbank.org/indicator)
