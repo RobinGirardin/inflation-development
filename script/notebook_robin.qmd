@@ -76,17 +76,23 @@ The data contains a lot of different countries. A useful denomination to discrim
 # Exploration
 
 ```{r}
-is_num <- function(x){
-    return(is.numeric(join[[x]]))
-}
 
-is_num(colnames(join)[1])
-is_num_columns <- lapply(colnames(join), FUN = is_num)
-sel <- dplyr::select(data = join, is_num_columns)
-cor(sel)
 ```
 
+To-do list:
+    1. Understanding the problem and how to go about it.
+        - Explore what you have at hand.
+            - Global exploration
+            - More precise exploration (CAREFUL: do not go too deep in the details before knowing the investment is worth it.)
+        - Explore how other did it / research to have a direction as to where to 'dig in' for information and direction.
+    - Exploration and Cleaning should go hand-in-hand: 
+    2. Cleaning
+        - Don't drop columns if they are useful. 
+        - Don't drop columns if create bias, change the narrative.
+        Warning: Dropping NA should have a reason.
+    3. Derive insights
 
+            
 
 # Sources
 
