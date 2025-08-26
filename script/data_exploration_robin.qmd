@@ -1,0 +1,62 @@
+# Inflation Developement Analysis
+
+## Context
+
+With the present document, I'll explore the data available, gather insights and inspect patterns in order to responde to the following questions:
+
+> How can we statistically characterize the behavior of inflation across countries, and has it significantly changed since 2000?
+
+More specifically, we would like to explore the following sub-objectives:
+
+1.  Are inflation distribution flat or fat-tailed?
+2.  Is inflation stationary or is there seasonal patterns?
+3.  How does crisis influence inflation markers?
+4.  Which indicators could be used to predict inflation rates?
+
+Before diving into the exploration, it is necessary to merge both available datasets into a single one, as well as do a simple cleaning.
+
+```{r}
+library(readr)
+library(dplyr)
+```
+
+
+## Preprocessing
+
+As mentioned before, the first step is the merging of both datasets.
+As demonstrated below, there are multiple condidates for merging keys:
+
+* 'year': containing unique year value from 2000 to 2024
+* 'country': containing 265 countries around the world name in the english locale.
+* 'iso2c' and 'iso3c', which are country identifiers.
+
+As the 'comp' data is only complementary to 'main', a right join on main is sensible. In order to avoid duplicated columns, I'll join those 4 possible identifiers.
+
+```{r}
+main <- readRDS("data/raw/main.rds")
+comp <- readRDS("data/raw/comp.rds")
+```
+
+```{r}
+print(paste0("Length of the 'year' column in `main`: ", length(main$year)))
+print(paste0("Length of the 'year' column in `comp`: ", length(comp$year)))
+
+print(paste0("'year' in main ranges from ", min(main$year), "to ", max(main$year)))
+print(paste0("'year' in main ranges from ", min(comp$year), "to ", max(comp$year)))
+```
+
+```{r}
+print(paste0("Amount of recorded unique countries in `main`: ", length(unique(main$country)), " for ", length(main$country), " total observations"))
+print(paste0("Amount of recorded unique countries in `comp`: ", length(unique(comp$country)), " for ", length(comp$country), " total observations"))
+
+print(paste0("Is Switzerland named 'Switzerland' (EN)? ", ("Switzerland" %in% unique(main$country)) & ("Switzerland" %in% unique(comp$country))))
+```
+
+```{r}
+join <- right_join(main, comp, by=c("year", "country", "iso2c", "iso3c"))
+```
+
+
+# Sources
+
+Our source of datasets and indicators: [World Bank Group](https://data.worldbank.org/indicator)
