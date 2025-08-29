@@ -17,7 +17,7 @@ indicators_main <- c(
   FM.LBL.BMNY.GD.ZS = "broad_money_pct",
   FI.RES.TOTL.CD = "total_reserve_usd",
   NY.GNP.MKTP.PP.CD = "gni_usd", # GNI per capita (current US$)
-  PA.NUS.PPP = "altas_conversation_factor" # Altas Conversation Factor
+  PA.NUS.PPP = "altas_conversion_factor" # Altas Conversion Factor
 )
  
 # indicators for the complementary dataset, focused on education and tertiary informations
