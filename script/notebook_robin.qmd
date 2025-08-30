@@ -272,10 +272,8 @@ Previously, we incorporated another dataset bringing a wealth classification for
 
 Let's now see how does the inflations developed across the years for each of those classes. We'll fit a non-linear model on the data as they shows trends more effectively than a simply linear model. Similarly, the `wealth_class` variable harldy contains missing values at all (`{r} round(sum(is.na(join_labeled$wealth_class)) / length(join_labeled$wealth_class), digits = 3)` - `{r} sum(is.na(join_labeled$wealth_class))`). However, we don't want the plot to contain a 'NA' legend and, since both wealth class and inflation missing values represent such a low percentage of the dataset, we'll drop drop each row containing missing values. Naturally, this will be done after filtering for unneeded columns as to not drop too much rows.
 
-# TODO: Is it significant?
-
 This plot offers more details compared the the previous plot. 
-Here, we can observe that, although inflation rate was relatively low across the past 25 years, some countries still experienced and are still experience comparatively high inflation (~20 %) compared to other countries.
+Here, we can observe that, although inflation rate was relatively low across the past 25 years, some countries still experienced and are still experiencin g comparatively high inflation (~20 %) compared to other countries.
 Additionnaly the richest the country, the less inflation it has.
 
 Concerning trend, poorest countries (L & LM) demonstrate a clear overall pattern across the past 25 years. Their inflation rate diminished up around 2010 before increasing again. Upper-middle countries maintained a slow and slow inflation increase, while wealthier countries show a more distribing pattern. They displayed a cycle pattern of global inflation increase at major crisis (2008 - subprime crisis and 2020 - cosis crisis), before entring a deflation phase.
@@ -354,6 +352,75 @@ print(sapply(c("H", "UM", "LM", "L"), get_unique))
 print("Number of countries per class: ")
 print(sapply(c("H", "UM", "LM", "L"), get_count))
 ```
+
+### Statistical Analysis
+
+The previous section described a lot of different pattern and insights. The goal of this present section is to confirm statistically previous insights.
+
+#### Do richer country have lower inflation rate?
+
+Say that the inflammation rate of each country is a random variable $X$ of 25 observation recolted over the years such that: 
+
+$$
+X = \{x_1, x_2, x_3, \dots, x_{25}\}
+$$
+
+$X$ is auto-correlated since $x_i$ depends on previous values. Indeed, if $x_22$ is high, there is a higher chance that $x_23$ will high as well. As such, $X$ isn't independant. 
+
+```{r}
+ch_acf <- acf(
+    join_labeled %>% filter(country == "Switzerland") %>% select(inflation_pct),
+    plot = FALSE)
+
+print("Auto-correlation of Switzerland's inflation a different lag year:")
+print(ch_acf)
+```
+
+Additionnaly, it is hard to assume that the inflation rate of each country is independant on another.
+
+```{r}
+ch_fr_cor <- cor(
+    join_labeled %>% filter(country == "Switzerland") %>% select(inflation_pct),
+    join_labeled %>% filter(country == "France") %>% select(inflation_pct),
+)
+
+print(paste0("Switzerland - France correlation: ", round(ch_fr_cor[1, 1], digits = 3)))
+```
+
+Nonetheless, we further simplify the situation and only look at the mean inflation per wealth class. As such, for simplicity, we assume independance of observation and test wether the wealth class has an influence on the inflation rate. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution. Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independant group: "H", "UM", "LM" and "L".
+
+```{r}
+ww_density <- ggplot(
+    data = plot_data,
+    mapping = aes(x = inflation_pct)) +
+    geom_density(color = "#addd8e", size = 0.75) +
+    labs(x = "Inflation (%)", y = "Density") +
+    ggtitle("'World-wide Inflation Distribution") +
+    theme_minimal()
+
+cls_density <- ggplot(
+    data = plot_data,
+    mapping = aes(x = inflation_pct, color = wealth_class)) +
+    geom_density(size = 0.75) +
+    xlim(0, 400) +
+    labs(x = "Inflation (%)", y = "Density") +
+    ggtitle("Inflation Distribution by Wealth Class") +
+    theme_minimal() + 
+    facet_wrap(~wealth_class)
+
+print(ww_density)
+print(cls_density)
+```
+
+```{r}
+prep_join <- join_labeled %>% 
+    select(wealth_class, inflation_pct, country) %>% 
+    drop_na()
+
+kruskal.test(inflation_pct ~ wealth_class, data = prep_join)
+```
+
 # Sources
 
 Datasets and indicators: [World Bank Group](https://data.worldbank.org/indicator)
