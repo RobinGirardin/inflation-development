@@ -2,14 +2,13 @@
 execute:
     code-fold: true
     code-summary: "Show the code"
-
 ---
 
 # Inflation Developement Analysis
 
 ## Context
 
-With the present document, we'll explore the data available, gather insights and inspect patterns in order to responde to the following questions:
+With the present document, we'll explore the data available, gather insights and inspect patterns in order to respond to the following questions:
 
 > How can we statistically characterize the behavior of inflation across countries, and has it significantly changed since 2000?
 
@@ -40,7 +39,7 @@ library(rstatix)
 
 ### Joining
 
-As mentioned before, the first step is the merging of both datasets. As demonstrated below, there are multiple condidates for merging keys:
+As mentioned before, the first step is the merging of both datasets. As demonstrated below, there are multiple candidates for merging keys:
 
 -   'year': containing unique year value from 2000 to 2024
 -   'country': containing 265 countries around the world name in the english locale.
@@ -81,24 +80,21 @@ join <- left_join(main, comp, by=c("year", "country", "iso2c", "iso3c"))
 
 At first sight, some variables contains a lot of missing values. One approach would be to remove the variable altogether, however, this would be only sensible if said variable isn't useful at all. Indeed, we should have a reason before trimming down the dataset. Hence, the sensible way to go about it is, firstly to learn more about predictors and important factors important for further analysis, secondly, deal with the missing value based on the insights gathered. Additionnaly, it is important to make sure that deleting any variables don't create bias.
 
-We currently have information about `{r} length(unique(join$country))` countries. Morever, as we planed to investigate differences between countries, we'll need some way to differentiate them. A good way of doing this is to determine which country is considered as 'poor' and 'rich'. For this purpose, we'll use the [World Bank Classification](#https://datahelpdesk.worldbank.org/knowledgebase/articles/906519-world-bank-country-and-lending-groups). Although there is the possibily of doing the classification ourselves, the benefits using a proved and valid method is clear. This could also be useful to see wether country wealth influence the presence of missing values.
+We currently have information about `{r} length(unique(join$country))` countries. Morever, as we planed to investigate differences between countries, we'll need some way to differentiate them. A good way of doing this is to determine which country is considered as 'poor' and 'rich'. For this purpose, we'll use the [World Bank Classification](#https://datahelpdesk.worldbank.org/knowledgebase/articles/906519-world-bank-country-and-lending-groups). Although there is the possibility of doing the classification ourselves, the benefits using a proved and valid method is clear. This could also be useful to see whether country wealth influence the presence of missing values.
 
-### Country Wealth Classes
+### Country Wealth Classes {#country-wealth-classes}
 
-This classification is made based on the each country Gross National Income per capital and the Altas Conversation Factor, which is way more effective way to compare exchange rates between countries. For more information about the method, see [World Bank Altas Method](https://datahelpdesk.worldbank.org/knowledgebase/articles/378832-what-is-the-world-bank-atlas-method). 
+This classification is made based on the each country Gross National Income per capital and the Altas Conversation Factor, which is way more effective way to compare exchange rates between countries. For more information about the method, see [World Bank Altas Method](https://datahelpdesk.worldbank.org/knowledgebase/articles/378832-what-is-the-world-bank-atlas-method).
 
-We used the historical classification dataset and then joined them with the already `join` data. 
-As the original dataset format (XLSX) was unsuited for conversion to CSV, we operated a small manual transformation procedure. A prior cleaning and transformation steps will unsure that both this and `join` dataset's format and compatible.
-
+We used the historical classification dataset and then joined them with the already `join` data. As the original dataset format (XLSX) was unsuited for conversion to CSV, we operated a small manual transformation procedure. A prior cleaning and transformation steps will unsure that both this and `join` dataset's format and compatible.
 
 **Cleaning**
 
 First, the wide-format dataset needs to be transformed into a long-format one. All columns except for country corresponds to yearly date, will be aggregated under a `year` variable and its values under a `wealth_class` categorical variable.
 
-Then each year will be stripped of their 'X' character and transformed into integers. Additionnaly, we'll group ".." and "" wealth categories together since they both signifies missing values and labelled them as missing values.
+Then each year will be stripped of their 'X' character and transformed into integers. Additionnaly, we'll group ".." and "" wealth categories together since they both signifies missing values and labeled them as missing values.
 
-Finally, we'll join both this dataset with the main dataset, `join`. However, the `join` dataset contains more countries than the historical wealth classification have (48). Indeed, the `join` dataset contains mislabeled items, such as 'Low Middle Income' or 'World'. In contrast, the historical wealth classification dataset contains no mislabelling. Those mislabeled information aren't useful in our work since we only look at country, and not any other made cateogization. This mean that the wealth classifaction data offers a way of filter out those mislabellings. It also span a longer time period, going back to 1984, compared to 2000 for the main dataset.
-Hence, we'll do an inner join on `country`, `iso3c` and `year`.
+Finally, we'll join both this dataset with the main dataset, `join`. However, the `join` dataset contains more countries than the historical wealth classification have (48). Indeed, the `join` dataset contains mislabeled items, such as 'Low Middle Income' or 'World'. In contrast, the historical wealth classification dataset contains no mislabeling. Those mislabeled information aren't useful in our work since we only look at country, and not any other made categorization. This mean that the wealth classification data offers a way of filter out those mislabeling. It also span a longer time period, going back to 1984, compared to 2000 for the main dataset. Hence, we'll do an inner join on `country`, `iso3c` and `year`.
 
 **Remark:** Additionnal meta information about the `wealth_class` can be found inside `data/raw/country_wealth_labels_meta.csv`.
 
@@ -165,20 +161,13 @@ join_labeled <- inner_join(join, long_wealth, by=c("country", "iso3c", "year"))
 
 ### Missing value across countries
 
-The dataset contains a lot of missing values, particularly in certain variables such as `debt_gdp_pct`totaling 76% of missing values, as well as `net_enrol_primary` and `net_entrol_secondary`, both being education enrolment measure. 
+The dataset contains a lot of missing values, particularly in certain variables such as `debt_gdp_pct`totaling 76% of missing values, as well as `net_enrol_primary` and `net_entrol_secondary`, both being education enrollment measure.
 
-In the graph below, you can observe the map representation of those missing values, across all countries
-and summed up over the year. Our observation measure is a single year, this means that countries in red provide very few information at all.
-Additionnaly, even though european countries seems to contain less missing values than others countries, 
-they are not exempt of them. 
+In the graph below, you can observe the map representation of those missing values, across all countries and summed up over the year. Our observation measure is a single year, this means that countries in red provide very few information at all. Additionnaly, even though european countries seems to contain less missing values than others countries, they are not exempt of them.
 
-The question as how to deal with the missing values is tricky. 
-Indeed, debt per GDP, which is an indicator of the economic health of a country, and education enrolement, wether be it primary or secondary, might reveal interesting relationships with inflation.
-Indeed, according a paper from [Fukunaga, I., Komatsuzaki, T. and Matsuoka, H. (2020)](#https://documents1.worldbank.org/curated/en/178761580308301016/pdf/Inflation-and-Public-Debt-Reversals-in-Advanced-Economies.pdf),
-inflation can alleviate debt, particularly when compared with the GDP as higher inflation lead to a increase of costs and good and thus of the GDP too.
+The question as how to deal with the missing values is tricky. Indeed, debt per GDP, which is an indicator of the economic health of a country, and education enrolement, wether be it primary or secondary, might reveal interesting relationships with inflation. Indeed, according a paper from [Fukunaga, I., Komatsuzaki, T. and Matsuoka, H. (2020)](#https://documents1.worldbank.org/curated/en/178761580308301016/pdf/Inflation-and-Public-Debt-Reversals-in-Advanced-Economies.pdf), inflation can alleviate debt, particularly when compared with the GDP as higher inflation lead to a increase of costs and good and thus of the GDP too.
 
-Hence, on the one hand we get rid of what could be important influence factors on inflation, or, in the other hand, 
-we keep them but can only focus on a handful of countries.
+Hence, on the one hand we get rid of what could be important influence factors on inflation, or, in the other hand, we keep them but can only focus on a handful of countries.
 
 ```{r}
 library(maps)
@@ -224,17 +213,13 @@ worldplot <- polygon_and_na %>%
 ggplotly(worldplot)
 ```
 
-
 # Exploration
 
 ## Overall Inflation Trend
 
+Our main point of focus is the inflation rate. Thus, let's plot this for all available countries first. Luckily, this variable hardly contain any missing values at all (`{r} round(sum(is.na(join_labeled$inflation_pct)) / length(join_labeled$inflation_pct), digits = 3)` - `{r} sum(is.na(join_labeled$inflation_pct))`). Hence, we can just leave them aside for now.
 
-Our main point of focus is the inflation rate. Thus, let's plot this for all available countries first. Luckily, this variable hardly contain any missing values at all (`{r} round(sum(is.na(join_labeled$inflation_pct)) / length(join_labeled$inflation_pct), digits = 3)` - `{r} sum(is.na(join_labeled$inflation_pct))`). 
-Hence, we can just leave them aside for now.
-
-The plot fit a linear and non-linear model on the data and each plot zoom further. Alhough, fitting linear model on time-series data isn't suited,
-as time-series data don't respect the I.I.D condition of linear/non-linear models, it can still provide quick usefull informations about trends.
+The plot fit a linear and non-linear model on the data and each plot zoom further. Alhough, fitting linear model on time-series data isn't suited, as time-series data don't respect the I.I.D condition of linear/non-linear models, it can still provide quick useful information about trends.
 
 An important remark, is that the 'zooming' don't exclude points, it merely zoom in. Consequently, the models are all fitted on the same data. Excluding points periodically would include a selection bias, as wealthier countries tend to have lower inflation rate and less inflation variability than poorer countries (see [Inflation trend per wealth class](#inflation-trend-per-wealth-class)).
 
@@ -267,17 +252,15 @@ cowplot::plot_grid(
     ncol = 3)
 ```
 
-## Inflation trend per wealth class
+## Inflation trend per wealth class {#inflation-trend-per-wealth-class}
 
-Previously, we incorporated another dataset bringing a wealth classification for each country across the yeas (see [Country Wealth Classes](#country-wealth-classes)). The classification computation is mainly based on the **Gross Nation Income, Altas Method**, which is accounts for prices increases. 
+Previously, we incorporated another dataset bringing a wealth classification for each country across the yeas (see [Country Wealth Classes](#country-wealth-classes)). The classification computation is mainly based on the **Gross Nation Income, Altas Method**, which is accounts for prices increases.
 
-Let's now see how does the inflations developed across the years for each of those classes. We'll fit a non-linear model on the data as they shows trends more effectively than a simply linear model. Similarly, the `wealth_class` variable harldy contains missing values at all (`{r} round(sum(is.na(join_labeled$wealth_class)) / length(join_labeled$wealth_class), digits = 3)` - `{r} sum(is.na(join_labeled$wealth_class))`). However, we don't want the plot to contain a 'NA' legend and, since both wealth class and inflation missing values represent such a low percentage of the dataset, we'll drop drop each row containing missing values. Naturally, this will be done after filtering for unneeded columns as to not drop too much rows.
+Let's now see how does the inflation developed across the years for each of those classes. We'll fit a non-linear model on the data as they shows trends more effectively than a simply linear model. Similarly, the `wealth_class` variable hardyl contains missing values at all (`{r} round(sum(is.na(join_labeled$wealth_class)) / length(join_labeled$wealth_class), digits = 3)` - `{r} sum(is.na(join_labeled$wealth_class))`). However, we don't want the plot to contain a 'NA' legend and, since both wealth class and inflation missing values represent such a low percentage of the dataset, we'll drop drop each row containing missing values. Naturally, this will be done after filtering for unneeded columns as to not drop too much rows.
 
-This plot offers more details compared the the previous plot. 
-Here, we can observe that, although inflation rate was relatively low across the past 25 years, some countries still experienced and are still experiencin g comparatively high inflation (~20 %) compared to other countries.
-Additionnaly the richest the country, the less inflation it has.
+This plot offers more details compared the the previous plot. Here, we can observe that, although inflation rate was relatively low across the past 25 years, some countries still experienced and are still experiencing comparatively high inflation (\~20 %) compared to other countries. Additionnaly the richest the country, the less inflation it has.
 
-Concerning trend, poorest countries (L & LM) demonstrate a clear overall pattern across the past 25 years. Their inflation rate diminished up around 2010 before increasing again. Upper-middle countries maintained a slow and slow inflation increase, while wealthier countries show a more distribing pattern. They displayed a cycle pattern of global inflation increase at major crisis (2008 - subprime crisis and 2020 - cosis crisis), before entring a deflation phase.
+Concerning trend, poorest countries (L & LM) demonstrate a clear overall pattern across the past 25 years. Their inflation rate diminished up around 2010 before increasing again. Upper-middle countries maintained a slow and slow inflation increase, while wealthier countries show a more distributed pattern. They displayed a cycle pattern of global inflation increase at major crisis (2008 - subprime crisis and 2020 - covid crisis), before entering a deflation phase.
 
 Interestingly, only wealthy countries seemed affect by the 2008 and 2020 crisis, as if the term "Global" in Global Financial crisis don't accounts for less developped countries.
 
@@ -361,15 +344,15 @@ print(sapply(c("H", "UM", "LM", "L"), get_count))
 
 The previous section described a lot of different pattern and insights. The goal of this present section is to confirm statistically previous insights.
 
-#### Do richer country have lower inflation rate?
+#### Do richer country have lower inflation rate? {#do-richer-country-have-lower-inflation-rate}
 
-Say that the inflammation rate of each country is a random variable $X$ of 25 observation recolted over the years such that: 
+Say that the inflammation rate of each country is a random variable $X$ of 25 observation recolted over the years such that:
 
 $$
 X = \{x_1, x_2, x_3, \dots, x_{25}\}
 $$
 
-$X$ is auto-correlated since $x_i$ depends on previous values. Indeed, if $x_22$ is high, there is a higher chance that $x_23$ will high as well. As such, $X$ isn't independant. 
+$X$ is auto-correlated since $x_i$ depends on previous values. Indeed, if $x_22$ is high, there is a higher chance that $x_23$ will high as well. As such, $X$ isn't independent.
 
 ```{r}
 ch_acf <- acf(
@@ -391,9 +374,9 @@ ch_fr_cor <- cor(
 print(paste0("Switzerland - France correlation: ", round(ch_fr_cor[1, 1], digits = 3)))
 ```
 
-Nonetheless, we further simplify the situation and only look at each country mean inflation and aggregate them per wealth class. We'll peform an analysis deciding on the statistical difference between the mean inflation of each wealth class. As such, we assume independance of observation and test wether the wealth class has an influence on the inflation rate. Indeed, it can be assume unlikely that an entire wealth class inflation is dependant on the inflation of another wealth class, especially since each country inflation rate over the year has been reduced to its mean. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+Nonetheless, we further simplify the situation and only look at each country mean inflation and aggregate them per wealth class. We'll perform an analysis deciding on the statistical difference between the mean inflation of each wealth class. As such, we assume independence of observation and test whether the wealth class has an influence on the inflation rate. Indeed, it can be assume unlikely that an entire wealth class inflation is dependent on the inflation of another wealth class, especially since each country inflation rate over the year has been reduced to its mean. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
 
-In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution. Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independant group: "H", "UM", "LM" and "L".
+In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution. Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independent group: "H", "UM", "LM" and "L".
 
 ```{r}
 ww_density <- ggplot(
@@ -456,7 +439,7 @@ knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
 
 In [Inflation trend per wealth class](#inflation-trend-per-wealth-class) we've observed graphically the variation difference in inflation between wealth classes (see @intra-class-inflation-var).
 
-In order to statistically confirm wether this assumption is right or wrong, we'll measure the standard deviation difference between each class.
+In order to statistically confirm whether this assumption is right or wrong, we'll measure the standard deviation difference between each class.
 
 ```{r}
 join_labeled %>% 
@@ -467,14 +450,13 @@ join_labeled %>%
     knitr::kable()
 ```
 
-Similar to the [Previous Section](#do-richer-country-have-lower-inflation-rate), we don't consider the inflation rate of a country to be independant. Additionnaly, it is also unlikely for the inflation rate between countries to be independant. However, we can circumvent this issue to aggregating each country value of the year into a single metric, and perform the analysis on wealth class instead of countries. 
-Since the data isn't normally distributed at all, we'll use the non-parametric Kruskal-Wallis Test.
+Similar to the [Previous Section](#do-richer-country-have-lower-inflation-rate), we don't consider the inflation rate of a country to be independent. Additionnaly, it is also unlikely for the inflation rate between countries to be independent. However, we can circumvent this issue to aggregating each country value of the year into a single metric, and perform the analysis on wealth class instead of countries. Since the data isn't normally distributed at all, we'll use the non-parametric Kruskal-Wallis Test.
 
-As per the Kruskal-Wallis test, the wealth class has a significant effect on the inflation standard deviation, with a large effect size. Each wealth class standard deviation is significantly different from each other.  
+As per the Kruskal-Wallis test, the wealth class has a significant effect on the inflation standard deviation, with a large effect size. Each wealth class standard deviation is significantly different from each other.
 
 **Conclusion:** The richer the country, the stabler is the inflation rate across country. For the richer country, which experience high perturbation during the 2008 and 2020 crisis, this means that, although the inflation rate changed, everything country moved in the same direction.
 
-This is the proof, or the consequence, or a highly globalized economy where each country is dependant on each other. As per the recent global economical turmoil, this can signify global drawbacks.
+This is the proof, or the consequence, or a highly globalized economy where each country is dependent on each other. As per the recent global economical turmoil, this can signify global drawbacks.
 
 ```{r}
 by_country <- by_country %>% 
@@ -501,7 +483,6 @@ print(
 
 knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
 ```
-
 
 # Sources
 
