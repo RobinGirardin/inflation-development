@@ -33,6 +33,7 @@ library(plotly)
 library(ggplot2)
 library(leaflet)
 library(cowplot)
+library(rstatix)
 ```
 
 ## Preprocessing
@@ -312,9 +313,12 @@ cowplot::plot_grid(
     ncol = 3)
 ```
 
-On top of the fact that the richer countries, the lower rate of inflation on average, intra-class variation also increase the poorer the country is. This could be partially explained by class imbalance. Indeed, although classes have a very similar numbers of **unique** countries, the there is a difference in the amount of observation between classes.
+On top of the fact that the richer countries, the lower rate of inflation on average, intra-class variation also increase the poorer the country is. This could be partially explained by class imbalance. Indeed, although classes have a very similar numbers of **unique** countries, there is a difference in the amount of observation between classes.
 
 ```{r}
+#| label: intra-class-inflation-var
+#| fig-cap: "Intra Class Inflation Variation"
+
 plot_data <- join_labeled %>% 
     select(year, country, wealth_class, inflation_pct) %>% 
     drop_na()
@@ -330,7 +334,7 @@ plot <- ggplot(
         alpha = 0.2) +
     coord_cartesian(ylim = c(0, 10)) +
     labs(x = "Year", y = "Inflation (%)") +
-    ggtitle(" Variance in inflation rate across wealth classes(2000-2024)") +
+    ggtitle(" Variance in inflation rate across wealth classes (2000-2024)") +
     theme_minimal()
 
 ggplotly(plot)
@@ -387,7 +391,8 @@ ch_fr_cor <- cor(
 print(paste0("Switzerland - France correlation: ", round(ch_fr_cor[1, 1], digits = 3)))
 ```
 
-Nonetheless, we further simplify the situation and only look at the mean inflation per wealth class. As such, for simplicity, we assume independance of observation and test wether the wealth class has an influence on the inflation rate. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+Nonetheless, we further simplify the situation and only look at each country mean inflation and aggregate them per wealth class. We'll peform an analysis deciding on the statistical difference between the mean inflation of each wealth class. As such, we assume independance of observation and test wether the wealth class has an influence on the inflation rate. Indeed, it can be assume unlikely that an entire wealth class inflation is dependant on the inflation of another wealth class, especially since each country inflation rate over the year has been reduced to its mean. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+
 In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution. Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independant group: "H", "UM", "LM" and "L".
 
 ```{r}
@@ -413,13 +418,90 @@ print(ww_density)
 print(cls_density)
 ```
 
-```{r}
-prep_join <- join_labeled %>% 
-    select(wealth_class, inflation_pct, country) %>% 
-    drop_na()
+As per the Kruskal-Wallis Test, there is a significant effect of the wealth class on the inflation rate. More specifically, each wealth class are significantly different from each other. Since the sample size is big, the effect size is a biased statistic, hence why we compute the effect size alongside it. Said effect size is considered large and thus support the previous significant claims.
 
-kruskal.test(inflation_pct ~ wealth_class, data = prep_join)
+**Conclusion:** The richer the country, the lower is the inflation rate.
+
+```{r}
+by_country <- join_labeled %>% 
+    select(wealth_class, country, inflation_pct) %>% 
+    drop_na() %>% 
+    group_by(country) %>% 
+    mutate(mean_infl_country = mean(inflation_pct))
+
+
+kw_model_s1 <- kruskal.test(mean_infl_country ~ wealth_class, data = by_country %>% ungroup())
+kw_p <- kw_model_s1$p.value
+
+kw_eta_s1 <- by_country %>% 
+    ungroup() %>%
+    kruskal_effsize(mean_infl_country ~ wealth_class)
+
+
+dunn_post_hoc <- dunn_test(by_country %>% ungroup(), mean_infl_country ~ wealth_class)
+
+print(paste0("Kruskal-Wallis Test p-value: ", kw_p))
+print(
+    paste0(
+        "Kruskal-Wallis Test effect size: ",
+        round(kw_eta_s1$effsize, digits = 3),
+        " with a ",
+        kw_eta_s1$magnitude,
+        " magnitude"))
+
+knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
 ```
+
+#### Do richer country have a more stable inflation rate compared to poorer countries?
+
+In [Inflation trend per wealth class](#inflation-trend-per-wealth-class) we've observed graphically the variation difference in inflation between wealth classes (see @intra-class-inflation-var).
+
+In order to statistically confirm wether this assumption is right or wrong, we'll measure the standard deviation difference between each class.
+
+```{r}
+join_labeled %>% 
+    select(wealth_class, inflation_pct, year) %>% 
+    drop_na() %>% 
+    group_by(wealth_class) %>% 
+    summarise(sd = sd(inflation_pct)) %>% 
+    knitr::kable()
+```
+
+Similar to the [Previous Section](#do-richer-country-have-lower-inflation-rate), we don't consider the inflation rate of a country to be independant. Additionnaly, it is also unlikely for the inflation rate between countries to be independant. However, we can circumvent this issue to aggregating each country value of the year into a single metric, and perform the analysis on wealth class instead of countries. 
+Since the data isn't normally distributed at all, we'll use the non-parametric Kruskal-Wallis Test.
+
+As per the Kruskal-Wallis test, the wealth class has a significant effect on the inflation standard deviation, with a large effect size. Each wealth class standard deviation is significantly different from each other.  
+
+**Conclusion:** The richer the country, the stabler is the inflation rate across country. For the richer country, which experience high perturbation during the 2008 and 2020 crisis, this means that, although the inflation rate changed, everything country moved in the same direction.
+
+This is the proof, or the consequence, or a highly globalized economy where each country is dependant on each other. As per the recent global economical turmoil, this can signify global drawbacks.
+
+```{r}
+by_country <- by_country %>% 
+    mutate(sd_infl_country = sd(inflation_pct))
+
+kw_model_s2 <- kruskal.test(sd_infl_country ~ wealth_class, data = by_country %>% ungroup())
+kw_p <- kw_model_s2$p.value
+
+kw_eta_s2 <- by_country %>% 
+    ungroup() %>%
+    kruskal_effsize(sd_infl_country ~ wealth_class)
+
+
+dunn_post_hoc <- dunn_test(by_country %>% ungroup(), sd_infl_country ~ wealth_class)
+
+print(paste0("Kruskal-Wallis Test p-value: ", kw_p))
+print(
+    paste0(
+        "Kruskal-Wallis Test effect size: ",
+        round(kw_eta_s2$effsize, digits = 3),
+        " with a ",
+        kw_eta_s2$magnitude,
+        " magnitude"))
+
+knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
+```
+
 
 # Sources
 
