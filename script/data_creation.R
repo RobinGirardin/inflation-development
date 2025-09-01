@@ -13,22 +13,23 @@ indicators_main <- c(
   SL.UEM.TOTL.ZS = "unemployment_pct", # Unemployment, total (% of labor force)
   NE.EXP.GNFS.ZS = "exports_gdp_pct", # Exports of goods and services (% of GDP)
   NE.IMP.GNFS.ZS = "imports_gdp_pct", # Imports of goods and services (% of GDP)
-  SP.POP.TOTL = "population_total" , # Population, total
+  SP.POP.TOTL = "population_total", # Population, total
   FM.LBL.BMNY.GD.ZS = "broad_money_pct",
   FI.RES.TOTL.CD = "total_reserve_usd",
   NY.GNP.MKTP.PP.CD = "gni_usd", # GNI per capita (current US$)
   PA.NUS.PPP = "altas_conversion_factor" # Altas Conversion Factor
 )
- 
-# indicators for the complementary dataset, focused on education and tertiary informations
+
+# indicators for the complementary dataset,
+# focused on education and tertiary informations
 indicators_comp <- c(
-  SP.URB.TOTL.IN.ZS = "urban_pop_pct",       # Urban population (% of total)
-  SP.DYN.LE00.IN    = "life_expectancy",     # Life expectancy at birth, total (years)
-  SE.PRM.NENR       = "net_enrol_primary",   # School enrollment, primary (% net)
-  SE.SEC.NENR       = "net_enrol_secondary", # School enrollment, secondary (% net)
-  SE.TER.ENRR       = "enrol_tertiary_gross",# School enrollment, tertiary (% gross)
-  SP.DYN.TFRT.IN    = "fertility_rate",      # Fertility rate, total (births per woman)
-  SP.POP.GROW       = "pop_growth_pct"       # Population growth (annual %)
+  SP.URB.TOTL.IN.ZS = "urban_pop_pct", # Urban population (% of total)
+  SP.DYN.LE00.IN = "life_expectancy", # Life expectancy at birth, total (years)
+  SE.PRM.NENR = "net_enrol_primary", # School enrollment, primary (% net)
+  SE.SEC.NENR = "net_enrol_secondary", # School enrollment, secondary (% net)
+  SE.TER.ENRR = "enrol_tertiary_gross", # School enrollment, tertiary (% gross)
+  SP.DYN.TFRT.IN = "fertility_rate", # Fertility rate, total (births per woman)
+  SP.POP.GROW = "pop_growth_pct" # Population growth (annual %)
 )
 
 print("Extracting data from WorldBank API using wdi::WDI() function. Please wait.")
