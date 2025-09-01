@@ -2,11 +2,10 @@
 execute:
     code-fold: true
     code-summary: "Show the code"
+    title: "Inflation Developement Analysis"
 ---
 
-# Inflation Developement Analysis
-
-## Context
+# Context
 
 With the present document, we'll explore the data available, gather insights and inspect patterns in order to respond to the following questions:
 
@@ -33,11 +32,13 @@ library(ggplot2)
 library(leaflet)
 library(cowplot)
 library(rstatix)
+library(ggbeeswarm)
+library(RColorBrewer)
 ```
 
-## Preprocessing
+# Preprocessing
 
-### Joining
+## Joining
 
 As mentioned before, the first step is the merging of both datasets. As demonstrated below, there are multiple candidates for merging keys:
 
@@ -58,7 +59,8 @@ comp <- readRDS("data/raw/comp.rds")
 print(paste0("Length of the 'year' column in `main`: ", length(main$year)))
 print(paste0("Length of the 'year' column in `comp`: ", length(comp$year)))
 
-print(paste0("'year' in main ranges from ", min(main$year), "to ", max(main$year)))
+print(
+  paste0("'year' in main ranges from ", min(main$year), "to ", max(main$year)))
 print(paste0("'year' in main ranges from ", min(comp$year), "to ", max(comp$year)))
 ```
 
@@ -165,7 +167,7 @@ The dataset contains a lot of missing values, particularly in certain variables 
 
 In the graph below, you can observe the map representation of those missing values, across all countries and summed up over the year. Our observation measure is a single year, this means that countries in red provide very few information at all. Additionnaly, even though european countries seems to contain less missing values than others countries, they are not exempt of them.
 
-The question as how to deal with the missing values is tricky. Indeed, debt per GDP, which is an indicator of the economic health of a country, and education enrolement, wether be it primary or secondary, might reveal interesting relationships with inflation. Indeed, according a paper from [Fukunaga, I., Komatsuzaki, T. and Matsuoka, H. (2020)](#https://documents1.worldbank.org/curated/en/178761580308301016/pdf/Inflation-and-Public-Debt-Reversals-in-Advanced-Economies.pdf), inflation can alleviate debt, particularly when compared with the GDP as higher inflation lead to a increase of costs and good and thus of the GDP too.
+The question as how to deal with the missing values is tricky. Indeed, debt per GDP, which is an indicator of the economic health of a country, and education enrollment, whether be it primary or secondary, might reveal interesting relationships with inflation. Indeed, according a paper from [Fukunaga, I., Komatsuzaki, T. and Matsuoka, H. (2020)](#https://documents1.worldbank.org/curated/en/178761580308301016/pdf/Inflation-and-Public-Debt-Reversals-in-Advanced-Economies.pdf), inflation can alleviate debt, particularly when compared with the GDP as higher inflation lead to a increase of costs and good and thus of the GDP too.
 
 Hence, on the one hand we get rid of what could be important influence factors on inflation, or, in the other hand, we keep them but can only focus on a handful of countries.
 
@@ -260,9 +262,9 @@ Let's now see how does the inflation developed across the years for each of thos
 
 This plot offers more details compared the the previous plot. Here, we can observe that, although inflation rate was relatively low across the past 25 years, some countries still experienced and are still experiencing comparatively high inflation (\~20 %) compared to other countries. Additionnaly the richest the country, the less inflation it has.
 
-Concerning trend, poorest countries (L & LM) demonstrate a clear overall pattern across the past 25 years. Their inflation rate diminished up around 2010 before increasing again. Upper-middle countries maintained a slow and slow inflation increase, while wealthier countries show a more distributed pattern. They displayed a cycle pattern of global inflation increase at major crisis (2008 - subprime crisis and 2020 - covid crisis), before entering a deflation phase.
+Concerning trend, poorest countries (L & LM) demonstrate a clear overall pattern across the past 25 years. Their inflation rate diminished up around 2010 before increasing again. Upper-middle countries maintained a slow and slow inflation increase, while wealthier countries show a more distributed pattern. They displayed a cycle pattern of global inflation increase at major crisis (2008 - subprime crisis and 2020 - COVID crisis), before entering a deflation phase.
 
-Interestingly, only wealthy countries seemed affect by the 2008 and 2020 crisis, as if the term "Global" in Global Financial crisis don't accounts for less developped countries.
+Interestingly, only wealthy countries seemed affect by the 2008 and 2020 crisis, as if the term "Global" in Global Financial crisis don't accounts for less developed countries.
 
 ```{r}
 plot_data <- join_labeled %>% 
@@ -338,6 +340,71 @@ print(sapply(c("H", "UM", "LM", "L"), get_unique))
 
 print("Number of countries per class: ")
 print(sapply(c("H", "UM", "LM", "L"), get_count))
+```
+
+Wealthier countries displayed an interesting cyclical pattern with few divergence across countries. Those pattern seems marked by increasing and decreasing inflation dictated by major crisis. Interesting would be to see wether those increase or decrease sequences marked different distribution properties.
+
+We observe the two following major crisis, both marked by the increased inflation rate: 
+- 2003 to 2008
+- 2017 to 2023
+
+```{r}
+join_labeled %>% 
+    filter(wealth_class == "H") %>% 
+    select(country, year, wealth_class, inflation_pct) %>% 
+    drop_na() %>% 
+    ggplot(
+        mapping = aes(x = year, y = inflation_pct)) +
+            geom_point(color = "#fee0d2") +
+            geom_smooth(color = "#fc9272") +
+            ggtitle("Inflation for wealthy countries") +
+            coord_cartesian(xlim = NULL, ylim = c(0, 20)) +
+            labs("Year", "Inflation (%)") +
+            theme_minimal()
+
+```
+
+During crisis, the inflation distribution has a slightly heavier tail.
+Computing mean, standard-deviation and median differences between both states didn't show much differences. However, if we remove the 60% inflation extreme outlier in the `is_crisis == FALSE` condition, we obtain a much more distinguishable difference. To conclude, it shows both crisis state and non-crisis state seems to have different distribution properties. 
+
+```{r}
+is_crisis <- function(year) {
+    if (year %in% c(seq(2003, 2008), seq(2017, 2023))) {
+        state <- TRUE
+    } else {
+        state <- FALSE
+    }
+    return(state)
+}
+
+join_crisis <- join_labeled %>% 
+    mutate(is_crisis = sapply(year, is_crisis))
+
+join_crisis %>% 
+    select(country, year, wealth_class, inflation_pct, is_crisis) %>% 
+    drop_na() %>% 
+    filter(wealth_class == "H") %>% 
+    ggplot(
+        mapping = aes(is_crisis, inflation_pct, fill = is_crisis)) +
+            geom_point(alpha = 0.3) +
+            geom_violin(alpha = 0.6) +
+            ggtitle("Inflation distribution - crisis dependent") +
+            theme_minimal()
+
+```
+
+```{r}
+join_crisis %>% 
+    select(country, year, wealth_class, inflation_pct, is_crisis) %>% 
+    drop_na() %>% 
+    filter(wealth_class == "H" & inflation_pct < 60) %>% 
+    group_by(is_crisis) %>% 
+    summarise(
+        mean = mean(inflation_pct),
+        sd = sd(inflation_pct),
+        median = sd(inflation_pct)
+    ) %>% 
+    knitr::kable()
 ```
 
 ### Statistical Analysis
@@ -483,6 +550,8 @@ print(
 
 knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
 ```
+
+
 
 # Sources
 
