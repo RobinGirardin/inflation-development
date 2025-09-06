@@ -1,4 +1,8 @@
 ---
+render: 
+    html:
+        toc: true
+        toc-float: true
 execute:
     code-fold: true
     code-summary: "Show the code"
@@ -34,6 +38,8 @@ library(cowplot)
 library(rstatix)
 library(ggbeeswarm)
 library(RColorBrewer)
+library(geepack)
+library(RESI)
 ```
 
 # Preprocessing
@@ -368,6 +374,8 @@ During crisis, the inflation distribution has a slightly heavier tail.
 Computing mean, standard-deviation and median differences between both states didn't show much differences. However, if we remove the 60% inflation extreme outlier in the `is_crisis == FALSE` condition, we obtain a much more distinguishable difference. To conclude, it shows both crisis state and non-crisis state seems to have different distribution properties. 
 
 ```{r}
+#| label: crisis-inflation-distribution
+#| fig-cap: "Inflation Distribution by Crisis Status"
 is_crisis <- function(year) {
     if (year %in% c(seq(2003, 2008), seq(2017, 2023))) {
         state <- TRUE
@@ -394,6 +402,9 @@ join_crisis %>%
 ```
 
 ```{r}
+#| label: crisis-inflation-summary
+#| fig-cap: "Inflation Distribution by Crisis Status - Summary Table"
+
 join_crisis %>% 
     select(country, year, wealth_class, inflation_pct, is_crisis) %>% 
     drop_na() %>% 
@@ -402,7 +413,7 @@ join_crisis %>%
     summarise(
         mean = mean(inflation_pct),
         sd = sd(inflation_pct),
-        median = sd(inflation_pct)
+        median = median(inflation_pct)
     ) %>% 
     knitr::kable()
 ```
@@ -430,7 +441,7 @@ print("Auto-correlation of Switzerland's inflation a different lag year:")
 print(ch_acf)
 ```
 
-Additionnaly, it is hard to assume that the inflation rate of each country is independant on another.
+Additionnaly, it is hard to assume that the inflation rate of each country is independant on another. A particular example is demonstrated below.
 
 ```{r}
 ch_fr_cor <- cor(
@@ -441,9 +452,43 @@ ch_fr_cor <- cor(
 print(paste0("Switzerland - France correlation: ", round(ch_fr_cor[1, 1], digits = 3)))
 ```
 
-Nonetheless, we further simplify the situation and only look at each country mean inflation and aggregate them per wealth class. We'll perform an analysis deciding on the statistical difference between the mean inflation of each wealth class. As such, we assume independence of observation and test whether the wealth class has an influence on the inflation rate. Indeed, it can be assume unlikely that an entire wealth class inflation is dependent on the inflation of another wealth class, especially since each country inflation rate over the year has been reduced to its mean. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+More specifically, the mean correlation between the inflation rate of all rich country is 0.44. It is enough for us to be prudent and assume dependance on this side.
 
-In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution. Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independent group: "H", "UM", "LM" and "L".
+```{r}
+wide_country <- join_labeled %>% 
+    filter(wealth_class == "H") %>% 
+    select(inflation_pct, year, country) %>%
+    drop_na() %>%
+    group_by(year) %>% 
+    mutate(mean = mean(inflation_pct)) %>% 
+    pivot_wider(id_cols = year, names_from = country, values_from = mean, values_fill = 0) %>% 
+    ungroup() %>% 
+    select(-year)
+
+cor_matrix <- expand.grid(colnames(wide_country), colnames(wide_country))
+
+correlation = c()
+for (i in 1:4761){
+    row = cor_matrix[i, ]
+    x_country = row[["Var1"]]
+    y_country = row[["Var2"]]
+    x = join_labeled %>% filter(country == x_country) %>% select(inflation_pct)
+    y = join_labeled %>% filter(country == y_country) %>% select(inflation_pct)
+    p = cor(x[, 1], y[, 1], use="complete")
+    correlation = append(correlation, p)
+}
+
+cor_matrix = cbind(cor_matrix, correlation)
+
+mean_cor <- mean(cor_matrix[cor_matrix$correlation < 1, ]$correlation)
+
+print(paste0("Mean pearson correlation between countries: ", round(mean_cor, digits=2)))
+
+```
+
+Nonetheless, we try our best to meet this condition by randomly taking a sample of observation in each group. This way, we reduce the possibility of cross and within-country influence on the inflation rate. This case is a classic case of an unpaired test, testing difference in means. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
+
+In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution (stafisfying the assumption of identically distributed observations.). Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independent group: "H", "UM", "LM" and "L".
 
 ```{r}
 ww_density <- ggplot(
@@ -470,25 +515,24 @@ print(cls_density)
 
 As per the Kruskal-Wallis Test, there is a significant effect of the wealth class on the inflation rate. More specifically, each wealth class are significantly different from each other. Since the sample size is big, the effect size is a biased statistic, hence why we compute the effect size alongside it. Said effect size is considered large and thus support the previous significant claims.
 
-**Conclusion:** The richer the country, the lower is the inflation rate.
+**Conclusion:** The richer the country, the lower is the inflation rate. **However**, it is important to note that such insights need to be taken with a grain of salt, as observation are totally independant of each other.
 
 ```{r}
-by_country <- join_labeled %>% 
+random_sample <- join_labeled %>% 
     select(wealth_class, country, inflation_pct) %>% 
     drop_na() %>% 
-    group_by(country) %>% 
-    mutate(mean_infl_country = mean(inflation_pct))
+    group_by(wealth_class) %>% 
+    slice_sample(prop=0.25) %>% 
+    ungroup()
 
-
-kw_model_s1 <- kruskal.test(mean_infl_country ~ wealth_class, data = by_country %>% ungroup())
+kw_model_s1 <- kruskal.test(inflation_pct ~ wealth_class, data = random_sample)
 kw_p <- kw_model_s1$p.value
 
-kw_eta_s1 <- by_country %>% 
-    ungroup() %>%
-    kruskal_effsize(mean_infl_country ~ wealth_class)
+kw_eta_s1 <- random_sample %>% 
+    kruskal_effsize(inflation_pct ~ wealth_class)
 
 
-dunn_post_hoc <- dunn_test(by_country %>% ungroup(), mean_infl_country ~ wealth_class)
+dunn_post_hoc <- dunn_test(random_sample, inflation_pct ~ wealth_class)
 
 print(paste0("Kruskal-Wallis Test p-value: ", kw_p))
 print(
@@ -517,27 +561,31 @@ join_labeled %>%
     knitr::kable()
 ```
 
-Similar to the [Previous Section](#do-richer-country-have-lower-inflation-rate), we don't consider the inflation rate of a country to be independent. Additionnaly, it is also unlikely for the inflation rate between countries to be independent. However, we can circumvent this issue to aggregating each country value of the year into a single metric, and perform the analysis on wealth class instead of countries. Since the data isn't normally distributed at all, we'll use the non-parametric Kruskal-Wallis Test.
+Similar to the [Previous Section](#do-richer-country-have-lower-inflation-rate), we don't consider the inflation rate of a country to be independent, as proven by the previously demonstrated by the slight auto-correlation. Hence, the same could be said by their standard deviation. Additionnaly, it is also unlikely for the inflation rate between countries to be independent. Consequently, we'll select randomly a sample from each sample, across all countries and years measured. This will ensure minimum influence of countries between each other and reduce the auto-correlation between observations of the same countries. The latter is further supported by the fact that said auto-correlation becomes negligible after 2-3 years.
+
+ Since the data isn't normally distributed, we'll use the non-parametric Kruskal-Wallis Test.
 
 As per the Kruskal-Wallis test, the wealth class has a significant effect on the inflation standard deviation, with a large effect size. Each wealth class standard deviation is significantly different from each other.
 
-**Conclusion:** The richer the country, the stabler is the inflation rate across country. For the richer country, which experience high perturbation during the 2008 and 2020 crisis, this means that, although the inflation rate changed, everything country moved in the same direction.
+**Conclusion:** The richer the country, the stabler is the inflation rate across country. For the richer country, which experience high perturbation during the 2008 and 2020 crisis, this means that, although the inflation rate changed, everything country moved in the same direction. **However**, it is important to note that such insights need to be taken with a grain of salt, as observation are totally independant of each other.
 
-This is the proof, or the consequence, or a highly globalized economy where each country is dependent on each other. As per the recent global economical turmoil, this can signify global drawbacks.
+This could be the proof, or the consequence, or a highly globalized economy where each country is dependent on each other. As per the recent global economical turmoil, this can signify global drawbacks.
 
 ```{r}
-by_country <- by_country %>% 
-    mutate(sd_infl_country = sd(inflation_pct))
+random_sample <- join_labeled %>% 
+    select(wealth_class, country, inflation_pct) %>% 
+    drop_na() %>% 
+    group_by(wealth_class) %>% 
+    slice_sample(prop=0.25) %>% 
+    mutate(sd_infl_country = sd(inflation_pct)) %>% 
+    ungroup() 
 
-kw_model_s2 <- kruskal.test(sd_infl_country ~ wealth_class, data = by_country %>% ungroup())
-kw_p <- kw_model_s2$p.value
+kw_model_s2 <- kruskal.test(sd_infl_country ~ wealth_class, data = random_sample)
 
-kw_eta_s2 <- by_country %>% 
-    ungroup() %>%
+kw_eta_s2 <- random_sample %>% 
     kruskal_effsize(sd_infl_country ~ wealth_class)
 
-
-dunn_post_hoc <- dunn_test(by_country %>% ungroup(), sd_infl_country ~ wealth_class)
+dunn_post_hoc <- dunn_test(random_sample, sd_infl_country ~ wealth_class)
 
 print(paste0("Kruskal-Wallis Test p-value: ", kw_p))
 print(
@@ -551,6 +599,117 @@ print(
 knitr::kable(dunn_post_hoc %>% select(.y., group1, group2, p.adj, p.adj.signif))
 ```
 
+#### Can inflation rate be used to predict crisis state?
+
+In [Inflation trend per wealth class](#inflation-trend-per-wealth-class) we've observed difference in mean, median and standard deviation between inflation during a crisis period and outside of a crisis period for wealthy countries. Consequently, 
+
+- Are those difference statistically significant?
+- If yes, can they be used to predict the crisis state given a inflation rate?
+
+Similar to both previous sections, and shown by @crisis-inflation-distribution, we tackling non-normal distribution having long tails. Hence, we'll need to tackle this problem using a non-parametric tests for 2 independant groups. Most non-parametric tests assume independance of observation in some shape or another. Currently, we have inflation recolted during crisis and outside crisis. Those informations have been recolted by the same countries for both group, which makes those two groups dependant on each other. Additionnaly, each as shown in [Do richer countries have lower inflation rate?](#do-richer-country-have-lower-inflation-rate), each country's inflation is auto-correlated. We can also assume some degree of dependance between the inflation in each country. Hence, not only there is between-group independance, we also have some degree of within-group dependance.
+
+In order to ensure independance of observation between groups, we'll split all wealthy countries in 2 groups. The first group will be used to measure inflation rate during crisis, while the second one will be used for inflation rate outside of crisis. 
+
+In order to ensure independance of observation within groups, each groups observation will be chosen randomly. This will remedy the problem of time by the fact that the auto-correlation become negligible after 2-3 years. Additionnaly, chosing randomly chosen observation by randomly chosen countries, lessen the probability of having observation influencing each other.
+
+As we can see using the result below, inflation rates significantly differ whitin or outside crisis. This confirm values optained in @crisis-inflation-summary and show that there is a possibility of infering wether wealthy countries are in a crisis situation based on their inflation rate. This could prove usefull to help countries and central banks adapt their policy.
+
+```{r}
+get_group <- function(id) {
+    if (id %in% seq(49)) {
+        group <- 1
+    } else {
+        group <- 2
+    }
+    return(group)
+}
+
+by_crisis_h <- join_crisis %>% 
+    filter(wealth_class == "H") %>% 
+    select(country, year, inflation_pct, is_crisis) %>% 
+    drop_na() %>% 
+    group_by(is_crisis)
+
+by_crisis_group_h <- by_crisis_h %>% 
+    ## Map each country to a unique ID  
+    mutate(country_id = as.integer(factor(country))) %>% 
+
+    ## Randomize country order for group attribution
+    slice(sample(1:n())) %>% 
+
+    ## Atribute a group for each country
+    mutate(group = sapply(country_id, get_group)) %>% 
+    
+    ## Sort them back in order
+    arrange(country)
+
+## Chose randomly 25% of each group for in-group independence.
+by_crisis_group_h_rand <- by_crisis_group_h %>% 
+    group_by(group) %>% 
+    slice_sample(prop=0.25) %>% 
+    ungroup()
+
+## Select both non-overlapping condition for between group independence.
+x <- by_crisis_group_h_rand %>% filter(group == 1 & is_crisis == TRUE) %>% select(inflation_pct)
+y <- by_crisis_group_h_rand %>% filter(group == 2 & is_crisis == FALSE) %>% select(inflation_pct)
+
+unpaired_wilcox <- wilcox.test(
+    x[[1]], y[[1]],
+    paired = FALSE
+    )
+
+print(paste0("Mann-Whitney U Test p-values: ", unpaired_wilcox$p.value))
+```
+
+##### Generalized Estimating Equations
+
+We previously indentified a pattern that, for wealthy countries, can be used to infer whether or not an economy is in a crisis period. Namely, the median of inflation rate distribution significantly differ between those two states.
+Exploiting the binary state of the crisis state (either we're in a crisis, or we're not) and their significant median difference, we construct a Generalized Estimating Equations model which works well with non-gaussian and correlated data data. 
+
+The result shows that inflation can indeed be used to predict crisis state.
+A increase of one point of inflation, increase the log-chance of 0.2552. In other word, the log-odds of crisis:non-crisis $P(Y=1):P(Y=0)$ increase by 0.2552, and, since which $log(p) = log(\frac{p}{1-p}) = 0.2552 = e^{0.2552} = 1.29 = p$, a 29% increase of being in a crisis state. This relationship is significant, and the effect size of such model is good. 
+
+**Conclusion:** We can conclude that inflation can indeed be a valid indicator of crisis-state for rich countries. Investigation for poorer countries was not-conducted since clear receptiveness to common historical crisis has not been found in the inflation rate.
+
+```{r}
+gee_data <- join_crisis %>% 
+    select(country, year, wealth_class, inflation_pct, is_crisis) %>% 
+    filter(wealth_class == "H" & inflation_pct < 60) %>% 
+    mutate(country = factor(country)) %>% 
+    drop_na()
+
+geeglm <- geeglm(
+        is_crisis ~ inflation_pct,
+        family = binomial,
+        data = gee_data,
+        id = country,
+        corstr = "ar1",
+    )
+
+summary(geeglm)
+print(resi(geeglm))
+```
+
+```{r}
+logistic_f <- function(x){
+    value <- (1 / (1 + exp(-geeglm$coefficients[1] - geeglm$coefficients[2]*x)))
+    return(value)
+}
+gee_data %>% 
+    mutate(y = as.integer(is_crisis)) %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = inflation_pct, y = y)) +
+        geom_point(color = "#a6bddb", alpha = 0.3) +
+        geom_smooth(
+            mapping = aes(y = logistic_f(inflation_pct)),
+            color = "#1c9099",
+            alpha = 0
+        ) +
+        labs(x = "Inflation (%)", y = "Crisis State") +
+        ggtitle("GEE fit") +
+        theme_minimal()
+```
 
 
 # Sources
