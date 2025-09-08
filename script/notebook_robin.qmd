@@ -1,12 +1,11 @@
 ---
-render: 
+title: "Inflation Developement"
+format: 
     html:
+        code-fold: true
+        code-summary: "Show the code"
         toc: true
         toc-float: true
-execute:
-    code-fold: true
-    code-summary: "Show the code"
-    title: "Inflation Developement Analysis"
 ---
 
 # Context
@@ -25,6 +24,7 @@ More specifically, we would like to explore the following sub-objectives:
 Before diving into the exploration, it is necessary to merge both available datasets into a single one, as well as do a simple cleaning.
 
 ```{r}
+#| include: false
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -55,8 +55,10 @@ As mentioned before, the first step is the merging of both datasets. As demonstr
 As the 'comp' data is only complementary to 'main', a right join on main is sensible. In order to avoid duplicated columns, we'll join those 4 possible identifiers.
 
 ```{r}
-main <- readRDS("data/raw/main.rds")
-comp <- readRDS("data/raw/comp.rds")
+#| include: false
+dir = "/Users/robingirardin/school/inflation-developement/"
+main <- readRDS(paste0(dir, "data/raw/main.rds"))
+comp <- readRDS(paste0(dir, "data/raw/comp.rds"))
 ```
 
 ```{r}
@@ -108,7 +110,7 @@ Finally, we'll join both this dataset with the main dataset, `join`. However, th
 
 ```{r}
 #| include: true
-wealth <- read.csv("data/raw/country_wealth_labels.csv")
+wealth <- read.csv(paste0(dir, "data/raw/country_wealth_labels.csv"))
 
 knitr::kable(wealth[1:5, 1:5])
 ```
@@ -178,8 +180,6 @@ The question as how to deal with the missing values is tricky. Indeed, debt per 
 Hence, on the one hand we get rid of what could be important influence factors on inflation, or, in the other hand, we keep them but can only focus on a handful of countries.
 
 ```{r}
-library(maps)
-
 world <- map_data("world")
 
 na_per_country <- join_labeled %>% 
