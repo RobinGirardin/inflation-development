@@ -841,9 +841,11 @@ join_labeled_clean %>%
 
 ### Correlation analysis
 
-Compared to the initial analysis done for cleaning purpose, nothinng much really change. `broad_money_pct` is still the best recorded predictor of inflation_rate with a negative association of -0.34. Naturally, this doesn't account for potential covariates and non-linear relationships, which broad money and inflation do (See [Broad Money - Inflation (%)](#broad-money-(---inflation))).
+Compared to the initial analysis done for cleaning purpose, nothinng much really change. `broad_money_pct` is still the best recorded predictor of inflation_rate with a negative association of -0.34. 
 
-Other notable relationship are: 
+Naturally, this doesn't account for potential covariates and non-linear relationships, which for example broad money (%) and inflation have (See [Broad Money - Inflation (%)](#broad-money-(---inflation))).
+
+Other notable relationships are: 
 - `imports_gdp_pct` - `export_gdp_pct`: 0.80702
 - `imports_gdp_pct` - `gdp_usd`: -0.3182
 - `total_reserve_usd` - `broad_money_pct`: 0.5119
@@ -855,6 +857,12 @@ Other notable relationship are:
 - `urban_pop_pct` - `net_enrol_secondary`: 0.5891
 - `urban_pop_pct` - `enrol_tertiary_gross`: 0.6410
 - `net_enrol_secondary` - `enrol_tertiary_gross`: 0.7927
+
+The correlation between those economic indicator such as the total reseve in usd and other indicators linked to the financial well-being of an economic such as GDP, GNI and broad money make sense. 
+Additionnaly, we can also observe high collinearity between GDP and GNI. While GNI measure each resident's final income (wages, investments, ..), GDP measure the value of the goods produced in a country. Such a high relationships make sense since GDP is used to compute the GNI.
+The high relationship between imports and exports would mean that the more a country imports, the more it exports. In this scenario, we could imagine the intervention of confounder variables driving this relationship. Indeed, imports and exports rate could act a proxy for financial well-being of an economy. Hence, the more a country imports, the better his economy, the better his economy, the more it produces, the more it produces, the more it exports. Especially, since imports and exports are computed in percentages of the GDP.
+
+Sadly, there is no major relationship recorded with the inflation rate.
 
 ```{r}
 cor_matrix_clean <- join_labeled_clean %>% 
