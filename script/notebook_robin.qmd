@@ -40,6 +40,7 @@ library(ggbeeswarm)
 library(RColorBrewer)
 library(geepack)
 library(RESI)
+library(fixest)
 ```
 
 # Preprocessing
@@ -488,7 +489,7 @@ print(paste0("Mean pearson correlation between countries: ", round(mean_cor, dig
 
 Nonetheless, we try our best to meet this condition by randomly taking a sample of observation in each group. This way, we reduce the possibility of cross and within-country influence on the inflation rate. This case is a classic case of an unpaired test, testing difference in means. A common test for this scenario would be an analysis of variance (ANOVA) or non-parametric tests.
 
-In our example, as demonstrated by the plots below the data isn't normally distributed. However, although not normally distributed, the observation of each wealth class seems to come from a similar distribution (stafisfying the assumption of identically distributed observations.). Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independent group: "H", "UM", "LM" and "L".
+In our example, as demonstrated by the plots below the data isn't normally distributed. In fact, the distribution looks very similary to the gamma distribution. Mapping the inflation rate to all countries with a gamma distribution $\Gamma(3, 0.5)$, we can see the heavy similarity between the two.The observation of each wealth class seems to come from a similar gamma distribution (stafisfying the assumption of identically distributed observations.). Hence, a sensible choice would be to go for a non-parametric tests. More specifically, a Kruskal-Wallis test since we 4 independent group: "H", "UM", "LM" and "L".
 
 ```{r}
 ww_density <- ggplot(
@@ -511,6 +512,27 @@ cls_density <- ggplot(
 
 print(ww_density)
 print(cls_density)
+```
+
+```{r}
+gamma <- rgamma(length(plot_data$inflation_pct), 3, rate=0.5)
+ww_density_gamma <- ggplot(
+    data = plot_data) +
+    geom_density(
+        mapping = aes(x = inflation_pct, color = "Inflation"), 
+        size = 0.75) +
+    geom_density(
+        mapping = aes(x = gamma, color = "Gamma"), 
+        size = 0.75) +
+    ggtitle("Goodness of fit") + 
+    scale_color_manual(values = c("Inflation" = "#addd8e", "Gamma" = "#2c7fb8")) +
+    labs(x = "Inflation (%)", y = "Density", color = "Distribution") +
+    theme_minimal()
+print(ww_density_gamma)
+```
+
+```{r}
+summary(ks.test(join_labeled$inflation_pct, "gamma", alternative = "two.sided"))
 ```
 
 As per the Kruskal-Wallis Test, there is a significant effect of the wealth class on the inflation rate. More specifically, each wealth class are significantly different from each other. Since the sample size is big, the effect size is a biased statistic, hence why we compute the effect size alongside it. Said effect size is considered large and thus support the previous significant claims.
@@ -668,6 +690,7 @@ Exploiting the binary state of the crisis state (either we're in a crisis, or we
 
 The result shows that inflation can indeed be used to predict crisis state.
 A increase of one point of inflation, increase the log-chance of 0.2552. In other word, the log-odds of crisis:non-crisis $P(Y=1):P(Y=0)$ increase by 0.2552, and, since which $log(p) = log(\frac{p}{1-p}) = 0.2552 = e^{0.2552} = 1.29 = p$, a 29% increase of being in a crisis state. This relationship is significant, and the effect size of such model is good. 
+It is also important to not that this relationships doesn't express the 'true' effect of inflation on the crisis state. Indeed, this model only evaluate a single predictor and doesn't account for omitted variable bias.
 
 **Conclusion:** We can conclude that inflation can indeed be a valid indicator of crisis-state for rich countries. Investigation for poorer countries was not-conducted since clear receptiveness to common historical crisis has not been found in the inflation rate.
 
@@ -711,6 +734,318 @@ gee_data %>%
         theme_minimal()
 ```
 
+## Predictors for inflation
+
+Finding predictors for inflation rate is of major concern for a lot of different institutions. Hence, in this section, we'll tackle the exploration of potential predictors for inflation.
+
+Those potential predictors include different economical and financial metric such as GDP, dept, GNI, broad money, but also other 'indirect' metrics that are might be linked with economical well-being, such as population growth, primary education enrolment, fertility rate,...
+
+### Overview of the data
+
+The data is a unbalanced panel data, recording yearly estimates of multiple countries from 2000 to 2024. 
+
+Panel data impose important countraints to the exploration. 
+
+First of all, the effect of time, in other words, the fact each estimates $X_{it} = \{ X_{i1}, X_{i2}, \dots, X_{i24} \}$ is auto-correlated and thus $X_{it}$ isn't independant.
+Second, panel data imposant additionnal error sources: time-variant error and time-invariant error. The latter references for example unobserved variable evolving with time which have an effect on the inflation_rate, while the former simply reference omitted time-invariant variable. A fixed effects or two-way fixed effect regression model could accomodate for such error. 
+However, another problem with time-series that is the fact that it included seasonality, non-stationarity and so one. Most regression don't go well with non-stationary data, which will need to be accounted for.
+
+As seen previously, inflation data in gamma distributed across all countries. 
+This distribution varies in shape and form depending on the wealth class but ultimately still comes from the same family. This shouldn't pose too much of a problem for subsequent analysis.
+
+### Cleaning
+
+The cleaning process mainly comprise of dealing with missing values. Before doing so, having a rudimentary understanding of the relationships between dependant-independant variable is important.
+
+#### Exploration of correlations
+
+Correlation is an effective way to observe relationships between data and look for potential good predictors. This assume linear relationships, which could be explored further using scatter plot. Panel data makes using correlation analysis as an inference trickier due to the assumption it involves. Fortunately, we'll only use it for exploration. Statistical inference will be done using an appropriate model. The goal of this step is merely understanding relationships slightly to guide the missing value cleaning process.
+
+Find below a dataframe containing pearson correlation values between all predictors and inflation.
+
+The highest association with inflation is the `broad_money_pct` variable, which is the the of all liquid financial instruments held by the country). This association is negative and of low-medium strength, with an coefficient of `-0.34`.
+
+However, there are too many effects going on influencing the association. For example, time-varying and time-invarying effect aren't taken into account here. This might be a reason why the correlation coefficient are so low overall.
+
+```{r}
+join_labeled %>% 
+    group_by(country) %>% 
+    mutate()
+cor_matrix <- join_labeled %>% 
+    select(where(is.numeric)) %>% 
+    cor(., use = "complete.obs")
+
+cor_matrix <- cor_matrix %>%
+    as.data.frame(cor_matrix, row.names = row.names(cor_matrix)) %>% 
+    arrange(inflation_pct) %>% 
+    select(inflation_pct)
+```
+
+#### Cleaning missing values
+
+We previously variable comprising a lot of different missing values. Some of those variable figures in the 'top' predictors identified above. Additionnaly, we also previously identified that most of those missing values figures in poorer countries.
+
+The primary goal of this section is to indentify predictors for inflation rate across the rate without limiting the sample to riche country only. In this sense, we'll drop out variable having a majority of missing values, and simply remove the rest row-wise. Keeping those variable would introduce a clear sampling bias.
+
+Depending on the analysis goal, the way we handle data and missing value would naturally change.
+
+List of variable that will be removed is: 
+* `life_expectancy` with 74%
+* `atlas_conversion_factor` with 55%
+* `fertility_rate` with 65%
+* `population_total` with 43%
+
+`dept_gdp_pct` is on the limit, however its an important economical factor describing the general healt of an economy. Consequently, we'll keep it.
+
+```{r}
+join_labeled_na <- join_labeled %>% 
+    summarise(across(everything(), ~ sum(is.na(.)))) %>% 
+    select(-country, -iso2c, -iso3c, -year) %>% 
+    pivot_longer(1:20, names_to="vars", values_to="nan") %>% 
+    mutate(nan_pct = round(nan / dim(join_labeled)[1] * 100, digits = 0))
+
+cor_matrix %>% 
+    mutate(vars = row.names(.))
+
+cor_matrix_na <- cbind(join_labeled_na, cor_matrix)
+
+print(cor_matrix_na %>% select(-vars))
+```
+
+Because of the amount predictors we would like to instpect, the cleaning reduced drastically the size of the dataset from `{r} dim(join_labeled)[1]` to `{r} dim(join_labeled_cleaned)[1]`. Although we managed to preserve a relatively unbiased population, the poorest country are almost absent of the dataset.
+
+```{r}
+join_labeled_clean <- join_labeled %>% 
+    select(
+        -life_expectancy,
+        -altas_conversation_factor,
+        -fertility_rate,
+        -population_total) %>% 
+    drop_na()
+
+print("List of country in the 'clean' dataset.")
+unique(join_labeled_clean$country)
+
+print("Proportion of wealth classes in the dataset")
+join_labeled_clean %>% 
+    group_by(wealth_class) %>% 
+    summarize(value_counts = n())
+
+print("'Poor' country: ")
+join_labeled_clean %>% 
+    filter(wealth_class == "L") %>% 
+    select(country) %>% 
+    unique(.)
+```
+
+
+### Correlation analysis
+
+Compared to the initial analysis done for cleaning purpose, nothinng much really change. `broad_money_pct` is still the best recorded predictor of inflation_rate with a negative association of -0.34. Naturally, this doesn't account for potential covariates and non-linear relationships, which broad money and inflation do (See [Broad Money - Inflation (%)](#broad-money-(---inflation))).
+
+Other notable relationship are: 
+- `imports_gdp_pct` - `export_gdp_pct`: 0.80702
+- `imports_gdp_pct` - `gdp_usd`: -0.3182
+- `total_reserve_usd` - `broad_money_pct`: 0.5119
+- `total_reserve_usd` - `gdp_usd`: 0.5128
+- `total_reserve_usd` - `gni_usd`: 0.5517
+- `total_reserve_usd` - `enrol_tertiary_gross`: 0.3063
+- `gni_usd` - `gdp_usd`: 0.9884
+- `urban_pop_pct` - `net_enrol_primary`: 0.4961
+- `urban_pop_pct` - `net_enrol_secondary`: 0.5891
+- `urban_pop_pct` - `enrol_tertiary_gross`: 0.6410
+- `net_enrol_secondary` - `enrol_tertiary_gross`: 0.7927
+
+```{r}
+cor_matrix_clean <- join_labeled_clean %>% 
+    select(where(is.numeric)) %>% 
+    cor(.)
+```
+
+
+### Fixed-Effects models
+
+In this present section, we'll look at the previous identified top predictors and analyze the different fixed-effects occuring and impacting the estimates. For this we'll use the `fixest` library in conjunction with the `etable` library for clear comparison.
+
+```{r}
+nullw_fixest <- feols(fml = inflation_pct ~ ), data = join_labeled)
+```
+
+### Broad Money (%) - Inflation
+
+
+The relationships between broad money and inflation isn't linear. This is likely the case because highly asymetric distribution of inflation and broad money. Indeed, as demonstrated below, they both come from a gamma distribution
+
+```{r}
+join_labeled %>% 
+    group_by(country) %>%
+    mutate_if(.predicate = is.numeric, .funs = ~ mean(., na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    filter(broad_money_pct < 2000) %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct, y = inflation_pct)
+    ) +
+    geom_point(color = "#2683e0ff", alpha = 0.025) +
+    labs(x = "Broad Money (%)", y = "Mean Inflation per Country(%)", title = "Broad Money - Mean Inflation Relationship") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    filter(broad_money_pct < 2000) %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct, y = inflation_pct)
+    ) +
+    geom_point(color = "#2683e0ff", alpha = 0.4) +
+    labs(x = "Broad Money (%)", y = "Inflation (%)", title = "Broad Money - Inflation relationship") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    filter(broad_money_pct < 2000, inflation_pct < 200) %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct, y = inflation_pct)
+    ) +
+    geom_point(color = "#2683e0ff", alpha = 0.4) +
+    labs(x = "Broad Money (%)", y = "Inflation (%)", title = "broad_money - inflation - Zoomed in") +
+    theme_minimal()
+```
+
+As we can see, different pattern of relationships are observable depending on the wealth class.
+It seems that, the richer the country, the less strong is the relationship between broad money and inflation. It makes sense since, the richer the country, the more money assets this economy have in circulation.
+
+```{r}
+join_labeled %>% 
+    filter(broad_money_pct < 2000, inflation_pct < 200) %>% 
+    select(inflation_pct, broad_money_pct, wealth_class) %>% 
+    drop_na() %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct, y = inflation_pct, color = wealth_class)
+    ) +
+    geom_point(alpha = 0.4) +
+    labs(x = "Broad Money (%)", y = "Inflation (%)", title = "Broad money - inflation - Zoomed in") +
+    theme_minimal()
+```
+
+```{r}
+gamma <- rgamma(3688, 2, rate=0.040)
+join_labeled %>% 
+    filter(broad_money_pct < 2000) %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct)
+    ) +
+    geom_density(
+        mapping = aes(x = gamma, fill = "Gamma (2, 0.040)"), alpha = 0.3) +
+    geom_density(
+        mapping = aes(x = broad_money_pct, fill = "Broad Money"), alpha = 0.3) +
+    scale_fill_manual(values = c("Broad Money" = "#1f78d1ff", "Gamma (2, 0.040)" = "#99b416ff")) +
+    labs(x = "Broad Money (%)", y = "Density", title = "Broad Money Distribution", fill = "Distribution") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    filter(broad_money_pct < 2000) %>%
+    select(broad_money_pct, wealth_class) %>%
+    drop_na() %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = broad_money_pct, color = wealth_class)
+    ) +
+    geom_density(
+        mapping = aes(x = broad_money_pct)) +
+    labs(x = "Broad Money (%)", y = "Density", title = "Broad money distribution per wealth class") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    filter(broad_money_pct < 2000) %>% 
+    group_by(year) %>% 
+    select(year, broad_money_pct) %>% 
+    mutate(mean_bm = mean(broad_money_pct, na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = year, y = mean_bm)
+    ) +
+    geom_line(color = "#0c64b5ff") +
+    labs(x = "Year", y = "Broad Money (%)", title = "Yearly Average Broad Money") +
+    theme_minimal() 
+```
+
+### Life expectancy - Inflation
+
+The distribution of life expectancy is shifted to the right. The shape and it depends on the country wealth class, as the richer the country, the more negatively skewed the data seems to be. This makes naturally sense as the richer a country becomes, the higher the the life expectancy.
+
+```{r}
+join_labeled %>% 
+    group_by(country) %>%
+    mutate_if(.predicate = is.numeric, .funs = ~ mean(., na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = life_expectancy, y = inflation_pct)
+    ) +
+    geom_point(color = "#2683e0ff", alpha = 0.025) +
+    labs(x = "Life Expectancy (%)", y = "Mean Inflation per Country(%)", title = "Life Expectancy - Mean Inflation Relationship") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = life_expectancy, y = inflation_pct)
+    ) +
+    geom_point(color = "#2683e0ff", alpha = 0.5) +
+    labs(x = "Life Expectancy", y = "Inflation (%)", title = "Life Expectancy - Inflation relationship") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>%
+    ggplot(
+        data = .
+    ) +
+    geom_density(
+        mapping = aes(x = life_expectancy, color = "Broad Money"), fill = "#1f78d1ff", alpha = 0.3) +
+    scale_color_manual(values = c("Life Expectancy" = "#1f78d1ff")) +
+    labs(x = "Life Expectancy", y = "Density", title = "Life Expectancy Distribution", color = "Distribution") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>%
+    select(life_expectancy, wealth_class) %>% 
+    drop_na() %>% 
+    ggplot(
+        data = .
+    ) +
+    geom_density(
+        mapping = aes(x = life_expectancy, fill = wealth_class), alpha = 0.3, size = 0.2) +
+    labs(x = "Life Expectancy", y = "Density", title = "Life Expectancy Distribution") +
+    theme_minimal()
+```
+
+```{r}
+join_labeled %>% 
+    select(life_expectancy, gdp_usd, wealth_class) %>% 
+    drop_na() %>% 
+    ggplot(
+        data = .,
+        mapping = aes(x = life_expectancy, y = gdp_usd, color = wealth_class)
+    ) +
+        geom_point(alpha = 0.5) +
+        labs(x = "Life expectancy", y = "GDP (USD)", title="Scatterplot")
+    theme_bw()
+```
 
 # Sources
 
