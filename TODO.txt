@@ -8,3 +8,6 @@
     - Don't drop columns if they are useful.
     - Don't drop columns if create bias, change the narrative. 
     Warning: Dropping NA should have a reason. 3. Derive insights
+
+REMARK: The report should include a short explanation of each variable of the dataset.
+Could be in the appendix too.
